@@ -1,0 +1,40 @@
+# Copy to simplemam.toml. Existing SQL Server tables are never created or migrated.
+[database]
+server = 'localhost'
+name = 'MAM'
+driver = 'ODBC Driver 18 for SQL Server'
+trusted_connection = true
+username = ''
+password = ''
+encrypt = true
+trust_server_certificate = false
+
+[auth]
+# Existing T_PASSWORDS format: plain or double_md5. No passwords are rewritten.
+password_format = 'plain'
+cookie_secure = false
+session_hours = 8
+
+[media]
+# Both kinds use material_number as one directory name.
+# thumbnail_root/{material_number}/thumbnail.jpg
+# hls_root/{material_number}/index.m3u8 (and the referenced playlists/segments)
+thumbnail_root = 'C:\SimpleMam\Media\Thumbnail'
+thumbnail_file = 'thumbnail.jpg'
+hls_root = 'C:\SimpleMam\Media\HLS'
+hls_file = 'index.m3u8'
+
+[upload]
+# Upload reception only, matching OpenMam. Does not insert material database rows.
+folder = 'C:\SimpleMam\Upload'
+max_file_bytes = 53687091200
+
+[server]
+host = '127.0.0.1'
+backend_port = 8000
+frontend_port = 3000
+nginx_port = 8080
+nginx_exe = 'C:\nginx\nginx.exe'
+
+[logging]
+folder = 'var/log'

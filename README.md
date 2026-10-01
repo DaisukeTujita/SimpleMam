@@ -37,6 +37,10 @@ Windows統合認証やUNC共有の権限には、スクリプトを実行するW
 メニューは `frontend/src/components/side-menu.tsx` の配列で定義します。子メニューや選択番組の動的追加はありません。
 PCの折りたたみはMUIのMini drawer方式で、開閉状態をlocalStorageに保存します。
 
+画面を追加する場合は、たとえば `frontend/src/app/pc/reports/page.tsx` を作り、
+`side-menu.tsx` の配列に `{ label: 'レポート', path: '/reports', Icon: ReportIcon }` を1件追加します。
+共通枠やルーターの登録は不要です。スマホにも必要な場合だけ `app/mobile/reports/page.tsx` を作ります。
+
 ## 機能
 
 - ログイン → グループ選択 → 素材・番組検索。グループ変更には再ログインが必要です。
@@ -88,5 +92,5 @@ HLSから参照するプレイリスト・セグメントも同じ素材番号�
 フロント：`frontend` で `npm ci` → `npm run dev`。直接Next.jsへアクセスする開発時だけ、`.env.local` に `SIMPLEMAM_BACKEND_URL=http://127.0.0.1:8000` を設定します。
 通常運用はnginxを通し、ブラウザーの `/api/` と `/media/` をFastAPIへ振り分けます。
 
-CIはPythonテスト、lint、型確認、本番ビルド、Playwrightの画面テストを実行します。
+CIはPythonテスト、lint、型確認、本番ビルド、Playwrightの画面テスト、Windowsのスクリプト構文確認を実行します。
 画面テストのHTTPモックは `frontend/tests/` 内だけで使い、アプリには含めません。実SQL ServerとWindows起動は実環境で別途確認が必要です。

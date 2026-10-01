@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+*.pyc
+*.tsbuildinfo
+var/
+simplemam.toml
+frontend/.env.local
+playwright-report/
+test-results/
