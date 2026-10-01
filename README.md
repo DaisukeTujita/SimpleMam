@@ -1,0 +1,92 @@
+# SimpleMam
+
+OpenMamの業務機能を、Next.js App Router・Material UI・FastAPIで実装する簡易版です。
+既存SQL Serverへ直接接続します。DBアダプター、デモ、Storybook、MXFプレイヤーはありません。
+
+## 起動（Windows）
+
+1. Node.js 24 LTS、Python 3.11以上、Microsoft ODBC Driver 18 for SQL Server、nginxをインストールします。
+2. `setup-simplemam.bat` を実行します。依存関係をインストールし、Next.jsを本番用にビルドします。
+3. 作成された `simplemam.toml` のDB接続、メディアフォルダー、アップロードフォルダー、nginx.exeのパスを設定します。
+4. `start-simplemam.bat` を実行します。通常は `http://localhost:8080/pc/materials` です。
+5. `stop-simplemam.bat` で停止します。変更後は再度セットアップでビルドしてください。
+
+スクリプトはDB接続確認後にNext.jsとnginxを起動します。既にポートが使用中の場合や起動に失敗した場合は終了します。
+停止対象は起動時に記録したPIDと開始時刻が一致するSimpleMamのプロセスだけです。
+本番用の `simplemam.toml`、セッション署名鍵、ログ、受信ファイルはGitへ登録しません。
+Windows統合認証やUNC共有の権限には、スクリプトを実行するWindowsアカウントが使われます。
+
+## 構造
+
+| 場所 | 役割 |
+|---|---|
+| `frontend/src/app/pc/` | PCのURL、共通枠、各画面と画面専用部品 |
+| `frontend/src/app/mobile/` | スマホのURL、共通枠、各画面。PCはここを参照しない |
+| `frontend/src/app/login/` | ログインとグループ選択 |
+| `frontend/src/components/` | 固定メニュー、素材詳細、運行表など端末に依存しない部品 |
+| `frontend/src/lib/` | API通信と型、日付・URLの処理 |
+| `frontend/src/theme.ts` | MUIのテーマ |
+| `backend/app/routers/` | FastAPIのAPI入口 |
+| `backend/app/services/` | 素材・番組・運行表のSQLと業務処理 |
+| `backend/app/db.py` | SQL Server接続とSQL計測 |
+| `backend/app/auth.py` | 認証、署名Cookie、グループ権限 |
+| `infra/` | nginx設定 |
+| `scripts/` | 起動・停止・セットアップ |
+
+共有部品はPC/スマホの画面をimportしません。スマホが不要なら `frontend/src/app/mobile/` を削除して再ビルドできます。
+メニューは `frontend/src/components/side-menu.tsx` の配列で定義します。子メニューや選択番組の動的追加はありません。
+PCの折りたたみはMUIのMini drawer方式で、開閉状態をlocalStorageに保存します。
+
+## 機能
+
+- ログイン → グループ選択 → 素材・番組検索。グループ変更には再ログインが必要です。
+- 素材検索：作成日、名称、素材番号、カテゴリ、ジャンル、登録経路、状態、種別。
+- PCは一覧／サムネイル切り替えと右側の詳細、スマホは2列カードと詳細ダイアログ。
+- 素材詳細：サムネイル、HLS、使用番組。名称・カテゴリ・ジャンル・素材内容・引継ぎメモを編集できます。
+- 番組検索：PCは一覧＋運行表プレビュー、スマホはカード一覧。詳細ページへ通常のリンクで移動します。
+- 番組名、大項目名、小項目名の編集、大項目・小項目の追加・削除。
+- 素材登録：FastAPI標準のmultipartアップロード。受信ファイルとメタデータを保存します。
+- 編集ボタンは常時表示し、権限がなければ無効にします。一般利用者は同一グループのみ、管理者は全グループを扱えます。
+
+素材登録はファイル受信だけです。DBへの素材登録・トランスコードは実施しません。
+アップロード再開（tus）は採用していません。通信断後は最初から再送します。アプリ内のデモAPIはありません。
+自動通知サービスはなく、更新ボタンで再取得します。運行表の移動・複製・素材割当は今回の初期実装には含めません。
+
+## メディア配置
+
+`M_SYSTEMS` / `M_SYSTEM_SETTINGS` と `T_MATERIAL_FILES` は参照しません。
+以下の配置だけを使います。ファイル名はTOMLで変更できます。素材種別によるパス分岐はありません。
+
+| 種類 | 配置例 | 配信URL |
+|---|---|---|
+| サムネイル | `thumbnail_root/MAT-001/thumbnail.jpg` | `/media/thumbnails/MAT-001/thumbnail.jpg` |
+| HLS | `hls_root/MAT-001/index.m3u8` | `/media/hls/MAT-001/index.m3u8` |
+
+HLSから参照するプレイリスト・セグメントも同じ素材番号フォルダー配下に置き、相対URLで参照してください。
+メディアURLは認証なしでアクセスできます。フォルダーは既存のローカルフォルダーまたはUNC共有を指定します。
+
+## DBの前提
+
+対象はOpenMamの `basic_sqlserver` が参照する既存DB定義です。テーブル作成・変更・データ投入は行いません。
+素材番号のサブ番号はAPI・検索・SQLから除外しています。既存DBの列を物理的に削除する処理はありません。
+
+- `T_MATERIAL_VERSIONS.material_number` は素材番号単位で一意である必要があります。重複は409エラーにし、勝手に一件を選びません。
+- 素材IDは文字列としてAPIから返します。タイトルのNULLは空文字、尺のNULLは未設定として表示します。尺はフレーム数（30フレームで1秒）です。
+- 番組は番組ID＋放送日で検索します。NULLと9999から始まる放送日は未定です。
+- 既存の大項目・小項目テーブルは放送日を持ちません。同じ番組IDが複数放送日に存在する場合、共有ブロックへの更新を禁止します。参照はできます。
+- 小項目IDはDBのIDENTITY、サブ番号を含む省略列はNULL許容またはDB既定値が必要です。
+- 素材・名称変更は現在値を確認してから更新します。大項目削除は配下の小項目を論理削除してから大項目を削除し、同一トランザクションで確定します。
+- 認証は `T_USERS`、`T_PASSWORDS`、`T_GROUPS`、`T_USERS_GROUPS` を使用します。管理者判定は `authority_flag` の末尾1桁です。
+- パスワード形式はTOMLの `plain` または `double_md5` で既存形式に合わせます。値の書き換えはしません。
+
+詳しい必要列は [DB仕様](docs/database.md) を参照してください。
+
+## 開発と検証
+
+バックエンド：`pip install -e './backend[test]'` → `uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000`。
+設定ファイルは既定でリポジトリ直下の `simplemam.toml` を読みます。`SIMPLEMAM_CONFIG` で絶対パスを指定できます。
+フロント：`frontend` で `npm ci` → `npm run dev`。直接Next.jsへアクセスする開発時だけ、`.env.local` に `SIMPLEMAM_BACKEND_URL=http://127.0.0.1:8000` を設定します。
+通常運用はnginxを通し、ブラウザーの `/api/` と `/media/` をFastAPIへ振り分けます。
+
+CIはPythonテスト、lint、型確認、本番ビルド、Playwrightの画面テストを実行します。
+画面テストのHTTPモックは `frontend/tests/` 内だけで使い、アプリには含めません。実SQL ServerとWindows起動は実環境で別途確認が必要です。
