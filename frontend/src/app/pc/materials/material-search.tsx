@@ -239,7 +239,9 @@ export default function MaterialSearch() {
                       "ジャンル",
                       "作成日",
                     ].map((label) => (
-                      <TableCell key={label}>{label}</TableCell>
+                      <TableCell key={label} sx={{ whiteSpace: "nowrap" }}>
+                        {label}
+                      </TableCell>
                     ))}
                   </TableRow>
                 </TableHead>
@@ -267,7 +269,9 @@ export default function MaterialSearch() {
                       <TableCell sx={{ minWidth: 220 }}>
                         {material.title}
                       </TableCell>
-                      <TableCell>{material.material_type}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {material.material_type}
+                      </TableCell>
                       <TableCell>
                         <Chip size="small" label={material.status} />
                       </TableCell>
