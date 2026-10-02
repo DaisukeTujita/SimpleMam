@@ -41,10 +41,14 @@ def engine():
         max_overflow=5,
     )
 
+    @event.listens_for(db, "connect")
+    def set_query_timeout(dbapi_connection, connection_record):
+        # pyodbc applies this connection setting to subsequently created cursors.
+        dbapi_connection.timeout = 30
+
     @event.listens_for(db, "before_cursor_execute")
     def before(conn, cursor, statement, parameters, context, executemany):
         context.started = perf_counter()
-        cursor.timeout = 30
 
     @event.listens_for(db, "after_cursor_execute")
     def after(conn, cursor, statement, parameters, context, executemany):

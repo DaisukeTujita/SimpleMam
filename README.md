@@ -5,7 +5,7 @@ OpenMamの業務機能を、Next.js App Router・Material UI・FastAPIで実装�
 
 ## 起動（Windows）
 
-1. Node.js 24 LTS、Python 3.11以上、Microsoft ODBC Driver 18 for SQL Server、nginxをインストールします。
+1. Node.js 24 LTS、Python 3.11以上、Microsoft ODBC Driver 17または18 for SQL Server、nginxをインストールします。
 2. `setup-simplemam.bat` を実行します。依存関係をインストールし、Next.jsを本番用にビルドします。
 3. 作成された `simplemam.toml` のDB接続、メディアフォルダー、アップロードフォルダー、nginx.exeのパスを設定します。
 4. `start-simplemam.bat` を実行します。通常は `http://localhost:8080/pc/materials` です。
@@ -15,6 +15,10 @@ OpenMamの業務機能を、Next.js App Router・Material UI・FastAPIで実装�
 停止対象は起動時に記録したPIDと開始時刻が一致するSimpleMamのプロセスだけです。
 本番用の `simplemam.toml`、セッション署名鍵、ログ、受信ファイルはGitへ登録しません。
 Windows統合認証やUNC共有の権限には、スクリプトを実行するWindowsアカウントが使われます。
+
+ODBC Driver 17を使用する場合は、`simplemam.toml` の `[database]` に
+`driver = 'ODBC Driver 17 for SQL Server'` を指定してください。サンプルの既定値は18です。
+SQLの実行タイムアウトはpyodbcの接続オブジェクトに30秒を設定します。
 
 ## 構造
 
