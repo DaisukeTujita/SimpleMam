@@ -5,7 +5,7 @@ OpenMamの業務機能を、Next.js App Router・Material UI・FastAPIで実装�
 
 ## 起動（Windows）
 
-1. Node.js 24 LTS、Python 3.11以上、Microsoft ODBC Driver 17または18 for SQL Server、nginxをインストールします。
+1. Node.js 24 LTS、Python 3.11以上、Microsoft ODBC Driver 17または18 for SQL Serverをインストールします。nginxを使う場合はnginxもインストールします。
 2. `setup-simplemam.bat` を実行します。依存関係をインストールし、Next.jsを本番用にビルドします。
 3. 作成された `simplemam.toml` のDB接続、メディアフォルダー、アップロードフォルダー、nginx.exeのパスを設定します。
 4. `start-simplemam.bat` を実行します。通常は `http://localhost:8080/pc/materials` です。
@@ -19,6 +19,18 @@ Windows統合認証やUNC共有の権限には、スクリプトを実行するW
 ODBC Driver 17を使用する場合は、`simplemam.toml` の `[database]` に
 `driver = 'ODBC Driver 17 for SQL Server'` を指定してください。サンプルの既定値は18です。
 SQLの実行タイムアウトはpyodbcの接続オブジェクトに30秒を設定します。
+
+### nginxなしで起動
+
+セットアップとTOMLのDB・メディア設定を済ませた後、`start-simplemam-no-nginx.bat` を実行します。
+FastAPIとNext.jsを起動し、通常は `http://127.0.0.1:3000/pc/materials` を開きます。
+起動ポートはTOMLの `backend_port` と `frontend_port` を使います。nginxのインストールや設定は不要です。
+`.env.local` を手動で作る必要もありません。APIとサムネイル・HLSはNext.jsの標準のrewritesで転送します。
+
+最初の起動時、またはバックエンドのホスト・ポートを変更した場合は、必要に応じて一度だけ本番ビルドを作り直します。
+その後は既存ビルドで起動します。Next.jsは開発モードではなく本番モードです。
+停止は共通の `stop-simplemam.bat` を使います。nginxあり／なしを切り替える際も、先に停止してください。
+ソース更新後は、従来どおり `setup-simplemam.bat` で再ビルドしてください。
 
 ## 構造
 
@@ -93,7 +105,7 @@ HLSから参照するプレイリスト・セグメントも同じ素材番号�
 
 バックエンド：`pip install -e './backend[test]'` → `uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000`。
 設定ファイルは既定でリポジトリ直下の `simplemam.toml` を読みます。`SIMPLEMAM_CONFIG` で絶対パスを指定できます。
-フロント：`frontend` で `npm ci` → `npm run dev`。直接Next.jsへアクセスする開発時だけ、`.env.local` に `SIMPLEMAM_BACKEND_URL=http://127.0.0.1:8000` を設定します。
+フロント：`frontend` で `npm ci` → `npm run dev`。直接Next.jsへアクセスする開発時は、`.env.local` に `SIMPLEMAM_BACKEND_URL=http://127.0.0.1:8000` を設定します。
 通常運用はnginxを通し、ブラウザーの `/api/` と `/media/` をFastAPIへ振り分けます。
 
 CIはPythonテスト、lint、型確認、本番ビルド、Playwrightの画面テスト、Windowsのスクリプト構文確認を実行します。

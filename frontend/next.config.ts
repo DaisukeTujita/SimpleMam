@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   poweredByHeader: false,
-  // Browser API requests go through nginx in production. This is only for `npm run dev`.
+  // Direct access (development or no-nginx startup) forwards API/media to FastAPI.
   async rewrites() {
     const backend = process.env.SIMPLEMAM_BACKEND_URL;
     return backend
