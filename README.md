@@ -32,6 +32,23 @@ FastAPIとNext.jsを起動し、通常は `http://127.0.0.1:3000/pc/materials` �
 停止は共通の `stop-simplemam.bat` を使います。nginxあり／なしを切り替える際も、先に停止してください。
 ソース更新後は、従来どおり `setup-simplemam.bat` で再ビルドしてください。
 
+### 起動に失敗した場合
+
+起動バッチは失敗した処理とバックエンド／フロントエンドのエラー末尾を表示します。
+`var/log/startup.log` に起動処理のエラー、`var/log/backend.stderr.log` にDBドライバーなどの詳しいエラーが残ります。
+`simplemam_*.log` には失敗した段階とSQLSTATEを記録します。
+以前の状態ファイルだけが残り、記録したプロセスが停止済みなら、その記録を除いて再起動します。
+
+nginxなしでもSQL Serverへの接続は必要です。DB接続に失敗すると、フロントエンドを起動する前に終了します。
+`simplemam.toml` の `[database]` にある接続先・DB名・ODBCドライバー名・認証方式を確認してください。
+`trusted_connection = true` はバッチを実行するWindowsアカウントでの認証です。
+SQL Serverのユーザー名・パスワードで接続する場合は `trusted_connection = false` にして `username` と `password` を設定します。
+`IM002` や「ドライバーが見つからない」の場合は、インストール済みODBCドライバーと `driver` の指定を合わせてください。
+サンプルはDriver 18です。Driver 17の環境では `driver = 'ODBC Driver 17 for SQL Server'` に変更します。
+TOMLのDB設定を変更しただけなら、セットアップやフロントエンドの再ビルドは不要です。
+サンプルは `encrypt = true` と `trust_server_certificate = false` を明示するため、Driver 17でも証明書を検証します。
+証明書エラーの場合はSQL Serverの証明書とクライアントの信頼設定を確認してください。
+
 ## 構造
 
 | 場所 | 役割 |

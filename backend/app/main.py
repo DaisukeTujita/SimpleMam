@@ -40,24 +40,43 @@ def configure_logging():
 async def lifespan(app):
     handler = configure_logging()
     logger = logging.getLogger("simplemam")
+    stage = "session configuration"
     try:
         logger.info("SimpleMam 0.1.0 startup; configuration loaded; database=SQL Server")
         serializer()
         # Fail immediately if the real DB is unavailable. Never fall back to a demo DB.
+        stage = "SQL Server connection"
         with engine().connect() as db:
             db.execute(text("SELECT 1"))
         for kind, prefix in (("thumbnail", "thumbnails"), ("hls", "hls")):
+            stage = f"media.{kind}_root directory"
             app.mount(
                 f"/media/{prefix}",
                 StaticFiles(directory=local_path(settings().media[f"{kind}_root"]), check_dir=True),
                 name=kind,
             )
+        stage = "application runtime or shutdown"
         yield
     except Exception as exc:
+        # The driver error can contain connection details. Log only its SQLSTATE here;
+        # uvicorn's traceback is available in backend.stderr.log on the same machine.
+        original = getattr(exc, "orig", None)
+        args = getattr(original, "args", ())
+        state = args[0] if args and isinstance(args[0], str) else "unknown"
+        if len(state) != 5 or not state.isascii() or not state.isalnum():
+            state = "unknown"
         logger.error(
-            "Startup or shutdown failed (%s). Check SQL Server connection, TOML and media folders.",
+            "Failed during %s (%s; SQLSTATE=%s). Details: var/log/backend.stderr.log.",
+            stage,
             type(exc).__name__,
+            state,
         )
+        if state == "IM002":
+            logger.error(
+                "ODBC driver not found. Set [database].driver in simplemam.toml to the exact installed "
+                "name, e.g. 'ODBC Driver 17 for SQL Server' when Driver 17 is installed. "
+                "The example configuration selects Driver 18."
+            )
         raise
     finally:
         if engine.cache_info().currsize:
