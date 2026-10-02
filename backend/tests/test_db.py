@@ -50,6 +50,7 @@ def test_query_timeout_is_applied_before_creating_cursors_and_survives_pool_reus
         return connection
 
     def create(url, **options):
+        assert options["hide_parameters"] is True
         assert make_url(url).drivername == "mssql+pyodbc"
         assert "DRIVER={ODBC Driver 17 for SQL Server}" in make_url(url).query["odbc_connect"]
         dialect = DefaultDialect(dbapi=SimpleNamespace(paramstyle="named", Error=RuntimeError))

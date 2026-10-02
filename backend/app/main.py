@@ -2,6 +2,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from time import perf_counter
+import traceback
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -93,23 +96,74 @@ for router in (auth.router, materials.router, programs.router, rundown.router, u
 @app.middleware("http")
 async def request_log(request: Request, call_next):
     request_id = uuid4().hex[:12]
-    if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("X-SimpleMam-Request") != "1":
-        return JSONResponse({"detail": "このリクエストは許可されていません"}, status_code=403)
-    response = await call_next(request)
+    request.state.request_id = request_id
+    started = perf_counter()
+    logger = logging.getLogger("simplemam.http")
+    is_api = request.url.path.startswith("/api/")
+    context = f"request={request_id} {request.method} {request.url.path}"
+    # Query strings, request bodies and cookies are intentionally omitted.
+    if is_api:
+        logger.info("RECEIVE %s", context)
+    try:
+        if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("X-SimpleMam-Request") != "1":
+            response = JSONResponse({"detail": "このリクエストは許可されていません"}, status_code=403)
+        else:
+            response = await call_next(request)
+    except Exception as exc:
+        if is_api:
+            logger.error(
+                "ERROR %s status=500 elapsed_ms=%.1f exception=%s location=%s",
+                context, (perf_counter() - started) * 1000, type(exc).__name__, error_location(exc),
+            )
+        raise
     response.headers["X-Request-Id"] = request_id
-    # Query strings can contain titles and user ids; only the path is recorded.
-    if request.url.path.startswith("/api/"):
-        logging.getLogger("simplemam.http").info(
-            "%s %s %s request=%s", request.method, request.url.path, response.status_code, request_id
+    if is_api:
+        logger.info(
+            "RESPONSE %s status=%s elapsed_ms=%.1f",
+            context, response.status_code, (perf_counter() - started) * 1000,
         )
     return response
 
 
+def error_location(exc):
+    # Record application file/line/function, without source lines or local variables.
+    folder = Path(__file__).resolve().parent
+    frames = [
+        f"{Path(frame.filename).relative_to(folder)}:{frame.lineno} ({frame.name})"
+        for frame in traceback.extract_tb(exc.__traceback__)
+        if Path(frame.filename).is_relative_to(folder)
+    ]
+    return " -> ".join(frames) or "unavailable"
+
+
 @app.exception_handler(SQLAlchemyError)
 async def database_error(request, exc):
-    # SQLAlchemy exceptions may include SQL/password bind values. Do not dump them.
-    logging.getLogger("simplemam").error("Database operation failed (%s)", type(exc).__name__)
-    return JSONResponse({"detail": "DB処理に失敗しました。ログとDBの定義を確認してください"}, status_code=503)
+    request_id = getattr(request.state, "request_id", "unknown")
+    original = getattr(exc, "orig", None)
+    args = getattr(original, "args", ())
+    state = args[0] if args and isinstance(args[0], str) else "unknown"
+    if len(state) != 5 or not state.isascii() or not state.isalnum():
+        state = "unknown"
+
+    def safe_text(value):
+        value = str(value)
+        password = settings().database.get("password", "")
+        if password:
+            value = value.replace(password, "[REDACTED]")
+        return " ".join(value.split())[:8000]
+
+    # Avoid str(exc): SQLAlchemy exceptions may include all bound parameter values.
+    message = original if original is not None else (exc.args[0] if exc.args else type(exc).__name__)
+    logging.getLogger("simplemam").error(
+        "Database operation failed request=%s %s %s exception=%s SQLSTATE=%s\n"
+        "Driver error: %s\nSQL: %s\nLocation: %s",
+        request_id, request.method, request.url.path, type(exc).__name__, state,
+        safe_text(message), safe_text(getattr(exc, "statement", None) or "unavailable"), error_location(exc),
+    )
+    return JSONResponse(
+        {"detail": "DB処理に失敗しました。ログとDBの定義を確認してください", "request_id": request_id},
+        status_code=503,
+    )
 
 
 @app.get("/api/health")
